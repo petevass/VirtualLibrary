@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Library Manager — My Activity</title>
+    <meta name="_csrf"        th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<!-- ===== Navbar ===== -->
+<nav>
+    <div class="nav-brand">
+        <span>&#128218;</span> Library Manager
+    </div>
+    <ul class="nav-links">
+        <li><a th:href="@{/}">Home</a></li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/catalouge}">Catalogue</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/events}">Events</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/activity}">My Activity</a>
+        </li>
+        <li sec:authorize="hasAuthority('ROLE_LIBRARIAN')">
+            <a th:href="@{/librarian}">Edit Catelouge and Events</a>
+        </li>
+        <li th:unless="${#authorization.expression('hasAuthority(''ROLE_OWNER'')')}" sec:authorize="hasAuthority('ROLE_ADMIN')">
+            <a th:href="@{/admin}">Edit Roles</a>
+        </li>
+        <li sec:authorize="hasAuthority('ROLE_OWNER')">
+            <a th:href="@{/owner}">Edit Roles</a>
+        </li>
+        <li sec:authorize="isAnonymous()">
+            <a th:href="@{/login}" class="btn-nav">Sign In</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <form th:action="@{/logout}" method="post" style="display:inline;">
+                <button type="submit" class="btn-logout">Logout</button>
+            </form>
+        </li>
+    </ul>
+</nav>
+
+<!-- Embed user email for JS filtering -->
+<span id="current-user-email"
+      th:data-email="${#authentication.name}"
+      style="display:none;"></span>
+
+<!-- ===== Page Header ===== -->
+<div class="catalogue-header">
+    <h1>&#128203; My Activity</h1>
+    <p th:text="${#authentication.principal.attributes['name']} != null
+        ? 'Welcome back, ' + ${#authentication.principal.attributes['name']}
+        : 'Your checkouts and events'">Your checkouts and events</p>
+</div>
+
+<!-- ===== Main Content ===== -->
+<div class="catalogue-body">
+
+    <!-- ── Books on Loan ─────────────────────────────────────────────── -->
+    <section class="activity-section">
+        <h2 class="activity-section-title">&#128218; Books on Loan</h2>
+        <div id="checkouts-container">
+            <div class="state-box">
+                <span class="state-icon">&#128218;</span>
+                <p>Loading your books…</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── My Events ─────────────────────────────────────────────────── -->
+    <section class="activity-section">
+        <h2 class="activity-section-title">&#128197; My Events</h2>
+        <div id="events-container">
+            <div class="state-box">
+                <span class="state-icon">&#128197;</span>
+                <p>Loading your events…</p>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<!-- ===== Toast ===== -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ===== Footer ===== -->
+<footer>
+    <p>&copy; 2026 Library Manager &mdash; Built with Spring Boot &amp; Thymeleaf</p>
+</footer>
+
+<style>
+    .activity-section {
+        margin-bottom: 2.5rem;
+    }
+
+    .activity-section-title {
+        font-family: Georgia, serif;
+        font-size: 1.35rem;
+        color: var(--green-dark);
+        border-bottom: 2px solid var(--cream-dark);
+        padding-bottom: 0.5rem;
+        margin-bottom: 1.25rem;
+    }
+
+    /* Book cards in activity (horizontal list style) */
+    .activity-book-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+
+    .activity-book-card {
+        background: var(--cream);
+        border: 1px solid var(--cream-dark);
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+
+    .activity-book-title {
+        font-family: Georgia, serif;
+        font-size: 1rem;
+        font-weight: bold;
+        color: var(--green-dark);
+    }
+
+    .activity-book-author {
+        font-family: Arial, sans-serif;
+        font-size: 0.83rem;
+        color: var(--text-muted);
+    }
+
+    .activity-book-meta {
+        font-family: Arial, sans-serif;
+        font-size: 0.78rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+
+    /* Event cards in activity */
+    .activity-event-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .activity-event-card {
+        background: var(--cream);
+        border: 1px solid var(--cream-dark);
+        border-radius: 10px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        transition: box-shadow 0.2s, transform 0.2s;
+    }
+
+    .activity-event-card:hover {
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+        transform: translateY(-2px);
+    }
+
+    .activity-event-header {
+        background: var(--green-dark);
+        color: #fff;
+        padding: 1rem 1.25rem;
+    }
+
+    .activity-event-date {
+        font-family: Arial, sans-serif;
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 0.35rem;
+    }
+
+    .activity-event-name {
+        font-family: Georgia, serif;
+        font-size: 1.15rem;
+        font-weight: bold;
+        line-height: 1.3;
+        margin: 0;
+    }
+
+    .activity-event-body {
+        padding: 1rem 1.25rem;
+        flex: 1;
+        font-family: Georgia, serif;
+        font-size: 0.92rem;
+        color: #444;
+        line-height: 1.6;
+    }
+
+    .activity-event-past {
+        opacity: 0.65;
+    }
+
+    .activity-event-past .activity-event-header {
+        background: #888;
+    }
+
+    .activity-event-past-label {
+        display: inline-block;
+        background: rgba(255,255,255,0.2);
+        border-radius: 4px;
+        font-size: 0.72rem;
+        padding: 0.1rem 0.45rem;
+        margin-top: 0.3rem;
+        font-family: Arial, sans-serif;
+    }
+</style>
+
+<script>
+    const csrfToken  = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+    const userEmail  = document.getElementById('current-user-email').dataset.email || '';
+
+    let myBooks = []; // books on loan, kept in sync for return
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadCheckouts();
+        loadEvents();
+    });
+
+    // ── Checkouts ─────────────────────────────────────────────────────────────
+    async function loadCheckouts() {
+        const container = document.getElementById('checkouts-container');
+        try {
+            const res = await fetch('/api/user/my_checkouts');
+            if (res.status === 404) {
+                container.innerHTML = `
+                    <div class="state-box">
+                        <span class="state-icon">&#9888;&#65039;</span>
+                        <p style="font-family:Arial,sans-serif;font-size:0.88rem;color:var(--text-muted);">
+                            The <code>/api/user/my_checkouts</code> endpoint has not been added yet.<br>
+                            Ask your developer to add it to <code>UserActionsAPIController</code>.
+                        </p>
+                    </div>`;
+                return;
+            }
+            if (!res.ok) throw new Error('Failed');
+            const books = await res.json();
+            renderCheckouts(books);
+        } catch {
+            container.innerHTML = `
+                <div class="state-box">
+                    <span class="state-icon">&#9888;&#65039;</span>
+                    <p>Could not load your checked-out books.</p>
+                </div>`;
+        }
+    }
+
+    function renderCheckouts(books) {
+        myBooks = books || [];
+        const container = document.getElementById('checkouts-container');
+        if (!myBooks.length) {
+            container.innerHTML = `
+                <div class="state-box">
+                    <span class="state-icon">&#128218;</span>
+                    <p>You have no books currently on loan.</p>
+                </div>`;
+            return;
+        }
+        container.innerHTML = `<div class="activity-book-list">${myBooks.map((b, i) => bookCard(b, i)).join('')}</div>`;
+    }
+
+    function bookCard(book, i) {
+        const format = book.paperback ? 'Paperback' : 'Hardcover';
+        return `
+        <div class="activity-book-card">
+            <div class="activity-book-title">${esc(book.title)}</div>
+            <div class="activity-book-author">by ${esc(book.author)}</div>
+            <div class="activity-book-meta">${esc(book.genre)} &bull; ${format}</div>
+            <div style="margin-top:0.6rem;">
+                <button class="btn btn-secondary btn-sm" onclick="returnBook(${i})">Return</button>
+            </div>
+        </div>`;
+    }
+
+    async function returnBook(i) {
+        const book = myBooks[i];
+        try {
+            const res = await fetch('/api/user/return_book', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+                body: JSON.stringify(book.id)
+            });
+            const msg = await res.text();
+            if (res.ok) {
+                showToast(msg || 'Book returned successfully!');
+                loadCheckouts(); // refresh the list
+            } else {
+                showToast(msg || 'Return failed.', true);
+            }
+        } catch { showToast('An error occurred.', true); }
+    }
+
+    // ── Events ────────────────────────────────────────────────────────────────
+    async function loadEvents() {
+        const container = document.getElementById('events-container');
+        try {
+            const res = await fetch('/api/user/get_events');
+            if (!res.ok) throw new Error('Failed');
+            const events = await res.json();
+            // Filter to events where the current user is in usersAttending
+            const myEvents = events.filter(e =>
+                Array.isArray(e.usersAttending) && e.usersAttending.includes(userEmail)
+            );
+            renderEvents(myEvents);
+        } catch {
+            container.innerHTML = `
+                <div class="state-box">
+                    <span class="state-icon">&#9888;&#65039;</span>
+                    <p>Could not load your events.</p>
+                </div>`;
+        }
+    }
+
+    function renderEvents(events) {
+        const container = document.getElementById('events-container');
+        if (!events || events.length === 0) {
+            container.innerHTML = `
+                <div class="state-box">
+                    <span class="state-icon">&#128197;</span>
+                    <p>You have not signed up for any events.</p>
+                </div>`;
+            return;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        events.sort((a, b) => parseDate(getField(a, 'date', 'Date')) - parseDate(getField(b, 'date', 'Date')));
+        container.innerHTML = `<div class="activity-event-list">${events.map(e => eventCard(e, today)).join('')}</div>`;
+    }
+
+    function getField(obj, lower, upper) {
+        return obj[lower] !== undefined ? obj[lower] : obj[upper];
+    }
+
+    function parseDate(raw) {
+        if (!raw) return new Date(NaN);
+        if (Array.isArray(raw)) return new Date(raw[0], raw[1] - 1, raw[2]);
+        if (typeof raw === 'object') {
+            const y = raw.year;
+            const m = (raw.monthValue != null ? raw.monthValue : 1) - 1;
+            const d = raw.dayOfMonth || 1;
+            return new Date(y, m, d);
+        }
+        const parts = String(raw).split('-').map(Number);
+        if (parts.length === 3 && !isNaN(parts[0])) return new Date(parts[0], parts[1] - 1, parts[2]);
+        return new Date(NaN);
+    }
+
+    function eventCard(event, today) {
+        const name        = getField(event, 'name', 'Name') || '';
+        const description = getField(event, 'description', 'Description') || '';
+        const rawDate     = getField(event, 'date', 'Date');
+
+        const eventDate = parseDate(rawDate);
+        const isPast    = !isNaN(eventDate) && eventDate < today;
+
+        const formattedDate = isNaN(eventDate)
+            ? 'Date unavailable'
+            : eventDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        const pastLabel = isPast ? `<span class="activity-event-past-label">Past Event</span>` : '';
+
+        return `
+        <div class="activity-event-card ${isPast ? 'activity-event-past' : ''}">
+            <div class="activity-event-header">
+                <div class="activity-event-date">${esc(formattedDate)}</div>
+                <div class="activity-event-name">${esc(name)}</div>
+                ${pastLabel}
+            </div>
+            <div class="activity-event-body">${esc(description) || '<em>No description provided.</em>'}</div>
+        </div>`;
+    }
+
+    // ── Utilities ─────────────────────────────────────────────────────────────
+    function showToast(message, isError = false) {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = 'toast' + (isError ? ' error' : '');
+        t.textContent = message;
+        c.appendChild(t);
+        setTimeout(() => t.remove(), 3100);
+    }
+
+    function esc(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+</script>
+
+</body>
+</html>

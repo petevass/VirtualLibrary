@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Library Manager — Add Book</title>
+    <meta name="_csrf"        th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<!-- ===== Navbar ===== -->
+<nav>
+    <div class="nav-brand">
+        <span>&#128218;</span> Library Manager
+    </div>
+    <ul class="nav-links">
+        <li><a th:href="@{/}">Home</a></li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/catalouge}">Catalogue</a>
+        </li>
+        <li sec:authorize="hasAuthority('ROLE_LIBRARIAN')">
+            <a th:href="@{/librarian}">Edit Catelouge and Events</a>
+        </li>
+        <li th:unless="${#authorization.expression('hasAuthority(''ROLE_OWNER'')')}" sec:authorize="hasAuthority('ROLE_ADMIN')">
+            <a th:href="@{/admin}">Edit Roles</a>
+        </li>
+        <li sec:authorize="hasAuthority('ROLE_OWNER')">
+            <a th:href="@{/owner}">Edit Roles</a>
+        </li>
+        <li sec:authorize="isAnonymous()">
+            <a th:href="@{/login}" class="btn-nav">Sign In</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <form th:action="@{/logout}" method="post" style="display:inline;">
+                <button type="submit" class="btn-logout">Logout</button>
+            </form>
+        </li>
+    </ul>
+</nav>
+<!-- ===== Page Header ===== -->
+<div class="panel-header">
+    <h1>&#43; Add New Book</h1>
+    <p>Fill in the details below to add a book to the catalogue</p>
+</div>
+
+<!-- ===== Form ===== -->
+<div class="form-page">
+    <div class="form-card">
+        <h2>Book Details</h2>
+
+        <div class="form-group">
+            <label class="form-label" for="title">Title</label>
+            <input class="form-input" id="title" type="text" placeholder="e.g. The Great Gatsby"/>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="author">Author</label>
+            <input class="form-input" id="author" type="text" placeholder="e.g. F. Scott Fitzgerald"/>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="genre">Genre</label>
+            <input class="form-input" id="genre" type="text" placeholder="e.g. Fiction"/>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="isbn">ISBN</label>
+            <input class="form-input" id="isbn" type="text" placeholder="e.g. 978-3-16-148410-0"/>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="description">Description</label>
+            <textarea class="form-textarea" id="description" placeholder="A brief description of the book…"></textarea>
+        </div>
+
+        <div class="form-group">
+            <div class="form-checkbox-row">
+                <input type="checkbox" id="paperback"/>
+                <label for="paperback">Paperback edition</label>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-primary" onclick="submitBook()">Add Book</button>
+            <a th:href="@{/librarian}" class="btn btn-secondary">Cancel</a>
+        </div>
+
+        <p id="error-msg" style="color:var(--red);font-family:Arial,sans-serif;font-size:0.9rem;margin-top:1rem;display:none;"></p>
+    </div>
+</div>
+
+<!-- ===== Footer ===== -->
+<footer>
+    <p>&copy; 2026 Library Manager &mdash; Built with Spring Boot &amp; Thymeleaf</p>
+</footer>
+
+<script>
+    const csrfToken  = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+    async function submitBook() {
+        const title       = document.getElementById('title').value.trim();
+        const author      = document.getElementById('author').value.trim();
+        const genre       = document.getElementById('genre').value.trim();
+        const isbn        = document.getElementById('isbn').value.trim();
+        const description = document.getElementById('description').value.trim();
+        const paperback   = document.getElementById('paperback').checked;
+
+        const errEl = document.getElementById('error-msg');
+        if (!title || !author || !genre || !isbn || !description) {
+            errEl.textContent = 'Please fill in all fields before submitting.';
+            errEl.style.display = 'block';
+            return;
+        }
+        errEl.style.display = 'none';
+
+        try {
+            const res = await fetch('/librarian/api/create_book', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+                body: JSON.stringify({ title, author, genre, isbn, description, paperback, available: true })
+            });
+            if (res.ok) {
+                window.location.href = '/librarian';
+            } else {
+                const msg = await res.text();
+                errEl.textContent = msg || 'Failed to add book. Please try again.';
+                errEl.style.display = 'block';
+            }
+        } catch {
+            errEl.textContent = 'An error occurred. Please try again.';
+            errEl.style.display = 'block';
+        }
+    }
+
+    // Allow Enter key to submit
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') submitBook();
+    });
+</script>
+
+</body>
+</html>

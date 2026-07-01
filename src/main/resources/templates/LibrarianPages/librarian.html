@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+    <title>Library Manager — Librarian Panel</title>
+
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+
+<body>
+
+<nav>
+    <div class="nav-brand">
+        <span>&#128218;</span> Library Manager
+    </div>
+
+    <ul class="nav-links">
+        <li>
+            <a th:href="@{/}">Home</a>
+        </li>
+
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/catalouge}">Catalogue</a>
+        </li>
+
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/events}">Events</a>
+        </li>
+
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/activity}">My Activity</a>
+        </li>
+
+        <li sec:authorize="hasAuthority('ROLE_LIBRARIAN')">
+            <a th:href="@{/librarian}">
+                Edit Catalogue and Events
+            </a>
+        </li>
+
+        <li th:unless="${#authorization.expression('hasAuthority(''ROLE_OWNER'')')}"
+            sec:authorize="hasAuthority('ROLE_ADMIN')">
+
+            <a th:href="@{/admin}">Edit Roles</a>
+        </li>
+
+        <li sec:authorize="hasAuthority('ROLE_OWNER')">
+            <a th:href="@{/owner}">Edit Roles</a>
+        </li>
+
+        <li sec:authorize="isAnonymous()">
+            <a th:href="@{/login}" class="btn-nav">
+                Sign In
+            </a>
+        </li>
+
+        <li sec:authorize="isAuthenticated()">
+            <form th:action="@{/logout}"
+                  method="post"
+                  style="display:inline;">
+
+                <button type="submit" class="btn-logout">
+                    Logout
+                </button>
+            </form>
+        </li>
+    </ul>
+</nav>
+
+<div class="panel-header">
+    <h1>&#128218; Librarian Panel</h1>
+    <p>Manage the book catalogue and library events</p>
+</div>
+
+<div class="panel-body">
+
+    <div class="tabs">
+        <button class="tab-btn active"
+                data-tab="books"
+                onclick="switchTab(this)">
+
+            &#128218; Books
+        </button>
+
+        <button class="tab-btn"
+                data-tab="events"
+                onclick="switchTab(this)">
+
+            &#128197; Events
+        </button>
+    </div>
+
+    <!-- Books tab -->
+    <div class="tab-pane active" id="tab-books">
+
+        <div class="table-toolbar">
+            <h2>All Books</h2>
+
+            <a th:href="@{/librarian/add-book}"
+               class="btn btn-primary">
+
+                &#43; Add Book
+            </a>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="data-table">
+
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Genre</th>
+                    <th>ISBN</th>
+                    <th>Format</th>
+                    <th>Status</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+
+                <tbody id="books-tbody">
+                <tr>
+                    <td colspan="9" class="table-loading">
+                        Loading books…
+                    </td>
+                </tr>
+                </tbody>
+
+            </table>
+        </div>
+    </div>
+
+    <!-- Events tab -->
+    <div class="tab-pane" id="tab-events">
+
+        <div class="table-toolbar">
+            <h2>All Events</h2>
+
+            <a th:href="@{/librarian/add-event}"
+               class="btn btn-primary">
+
+                &#43; Add Event
+            </a>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="data-table">
+
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Attendees</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+
+                <tbody id="events-tbody">
+                <tr>
+                    <td colspan="6" class="table-loading">
+                        Loading events…
+                    </td>
+                </tr>
+                </tbody>
+
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal-overlay" id="delete-modal">
+
+    <div class="modal-box">
+        <h3>&#9888;&#65039; Confirm Deletion</h3>
+
+        <p id="delete-modal-msg">
+            Are you sure you want to delete this item?
+        </p>
+
+        <div class="modal-actions">
+            <button class="btn btn-secondary"
+                    onclick="closeModal()">
+
+                Cancel
+            </button>
+
+            <button class="btn btn-danger"
+                    id="modal-confirm-btn">
+
+                Delete
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<footer>
+    <p>
+        &copy; 2026 Library Manager &mdash;
+        Built with Spring Boot &amp; Thymeleaf
+    </p>
+</footer>
+
+<script>
+    const csrfToken =
+        document.querySelector('meta[name="_csrf"]')
+            .getAttribute('content');
+
+    const csrfHeader =
+        document.querySelector('meta[name="_csrf_header"]')
+            .getAttribute('content');
+
+    // Tab switching
+    function switchTab(button) {
+        document.querySelectorAll('.tab-pane')
+            .forEach(pane => pane.classList.remove('active'));
+
+        document.querySelectorAll('.tab-btn')
+            .forEach(tabButton => tabButton.classList.remove('active'));
+
+        document
+            .getElementById('tab-' + button.dataset.tab)
+            .classList.add('active');
+
+        button.classList.add('active');
+    }
+
+    // Delete modal
+    let pendingDelete = null;
+
+    function confirmDelete(message, action) {
+        document.getElementById('delete-modal-msg')
+            .textContent = message;
+
+        pendingDelete = action;
+
+        document.getElementById('delete-modal')
+            .classList.add('open');
+    }
+
+    function closeModal() {
+        document.getElementById('delete-modal')
+            .classList.remove('open');
+
+        pendingDelete = null;
+    }
+
+    document.getElementById('modal-confirm-btn')
+        .addEventListener('click', () => {
+            if (pendingDelete) {
+                pendingDelete();
+            }
+
+            closeModal();
+        });
+
+    document.getElementById('delete-modal')
+        .addEventListener('click', function (event) {
+            if (event.target === this) {
+                closeModal();
+            }
+        });
+
+    // Load books
+    async function loadBooks() {
+        const tbody =
+            document.getElementById('books-tbody');
+
+        tbody.innerHTML =
+            '<tr><td colspan="9" class="table-loading">Loading…</td></tr>';
+
+        try {
+            const response =
+                await fetch('/api/user/get_all_books');
+
+            if (!response.ok) {
+                throw new Error(
+                    'Failed to load books. Status: ' + response.status
+                );
+            }
+
+            const books =
+                await response.json();
+
+            if (!Array.isArray(books) || books.length === 0) {
+                tbody.innerHTML =
+                    '<tr><td colspan="9" class="table-empty">No books in the catalogue.</td></tr>';
+
+                return;
+            }
+
+            tbody.innerHTML = books.map((book, index) => {
+
+                const title =
+                    book.title ??
+                    book.Title ??
+                    '';
+
+                const author =
+                    book.author ??
+                    book.Author ??
+                    '';
+
+                const genre =
+                    book.genre ??
+                    book.Genre ??
+                    '';
+
+                const isbn =
+                    book.isbn ??
+                    book.Isbn ??
+                    book.ISBN ??
+                    '';
+
+                const description =
+                    book.description ??
+                    book.Description ??
+                    '';
+
+                const paperback =
+                    book.paperback ??
+                    book.isPaperback ??
+                    book.IsPaperback ??
+                    false;
+
+                const available =
+                    book.available ??
+                    book.isAvailable ??
+                    book.IsAvailable ??
+                    false;
+
+                const id =
+                    book.id ??
+                    book.Id ??
+                    '';
+
+                return `
+                    <tr>
+                        <td style="color:var(--text-muted);font-size:0.78rem;">
+                            ${index + 1}
+                        </td>
+
+                        <td>
+                            <strong>${escapeHtml(title)}</strong>
+                        </td>
+
+                        <td>
+                            ${escapeHtml(author)}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(genre)}
+                        </td>
+
+                        <td style="font-family:monospace;font-size:0.82rem;">
+                            ${escapeHtml(isbn)}
+                        </td>
+
+                        <td>
+                            ${paperback ? 'Paperback' : 'Hardcover'}
+                        </td>
+
+                        <td>
+                            <span class="status-badge ${available ? 'avail' : 'checked'}">
+                                ${available ? 'Available' : 'Checked Out'}
+                            </span>
+                        </td>
+
+                        <td style="
+                            max-width:200px;
+                            overflow:hidden;
+                            text-overflow:ellipsis;
+                            color:var(--text-muted);
+                        ">
+                            ${escapeHtml(description)}
+                        </td>
+
+                        <td>
+                            <button
+                                class="btn btn-danger btn-sm"
+                                onclick='askDeleteBook(
+                                    ${JSON.stringify(id)},
+                                    ${JSON.stringify(title)}
+                                )'>
+
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (error) {
+            console.error('Book loading error:', error);
+
+            tbody.innerHTML =
+                '<tr><td colspan="9" class="table-empty">Failed to load books.</td></tr>';
+        }
+    }
+
+    function askDeleteBook(id, title) {
+        confirmDelete(
+            `Are you sure you want to remove "${title}" from the catalogue?`,
+            () => deleteBook(id)
+        );
+    }
+
+    async function deleteBook(bookId) {
+        try {
+            const response =
+                await fetch('/librarian/api/remove_book', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        [csrfHeader]: csrfToken
+                    },
+                    body: JSON.stringify(bookId)
+                });
+
+            const message =
+                await response.text();
+
+            if (response.ok) {
+                showToast(message || 'Book removed.');
+                loadBooks();
+            } else {
+                showToast(
+                    message || 'Failed to remove book.',
+                    true
+                );
+            }
+
+        } catch (error) {
+            console.error('Delete book error:', error);
+            showToast('An error occurred.', true);
+        }
+    }
+
+    // Load events
+    async function loadEvents() {
+        const tbody =
+            document.getElementById('events-tbody');
+
+        tbody.innerHTML =
+            '<tr><td colspan="6" class="table-loading">Loading…</td></tr>';
+
+        try {
+            const response =
+                await fetch('/librarian/api/get_events');
+
+            if (!response.ok) {
+                throw new Error(
+                    'Failed to load events. Status: ' + response.status
+                );
+            }
+
+            const events =
+                await response.json();
+
+            console.log('Events returned by API:', events);
+
+            if (!Array.isArray(events) || events.length === 0) {
+                tbody.innerHTML =
+                    '<tr><td colspan="6" class="table-empty">No events scheduled.</td></tr>';
+
+                return;
+            }
+
+            tbody.innerHTML = events.map((event, index) => {
+
+                const name =
+                    event.name ??
+                    event.Name ??
+                    '';
+
+                const date =
+                    event.date ??
+                    event.Date ??
+                    '';
+
+                const description =
+                    event.description ??
+                    event.Description ??
+                    '';
+
+                const usersAttending =
+                    event.usersAttending ??
+                    event.UsersAttending ??
+                    [];
+
+                const attendeeCount =
+                    Array.isArray(usersAttending)
+                        ? usersAttending.length
+                        : 0;
+
+                /*
+                 * Keep the original object for deletion.
+                 * This avoids changing the property names expected by
+                 * your existing backend.
+                 */
+                const encodedEvent =
+                    encodeURIComponent(
+                        JSON.stringify(event)
+                    );
+
+                return `
+                    <tr>
+                        <td style="color:var(--text-muted);font-size:0.78rem;">
+                            ${index + 1}
+                        </td>
+
+                        <td>
+                            <strong>${escapeHtml(name)}</strong>
+                        </td>
+
+                        <td>
+                            ${escapeHtml(date)}
+                        </td>
+
+                        <td style="
+                            max-width:240px;
+                            overflow:hidden;
+                            text-overflow:ellipsis;
+                            color:var(--text-muted);
+                        ">
+                            ${escapeHtml(description)}
+                        </td>
+
+                        <td>
+                            ${attendeeCount}
+                        </td>
+
+                        <td>
+                            <button
+                                class="btn btn-danger btn-sm"
+                                onclick='askDeleteEvent(
+                                    ${JSON.stringify(encodedEvent)},
+                                    ${JSON.stringify(name)}
+                                )'>
+
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (error) {
+            console.error('Event loading error:', error);
+
+            tbody.innerHTML =
+                '<tr><td colspan="6" class="table-empty">Failed to load events.</td></tr>';
+        }
+    }
+
+    function askDeleteEvent(encodedEvent, name) {
+        confirmDelete(
+            `Are you sure you want to delete the event "${name}"?`,
+            () => deleteEvent(encodedEvent)
+        );
+    }
+
+    async function deleteEvent(encodedEvent) {
+        const event =
+            JSON.parse(
+                decodeURIComponent(encodedEvent)
+            );
+
+        try {
+            const response =
+                await fetch('/librarian/api/delete_event', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        [csrfHeader]: csrfToken
+                    },
+                    body: JSON.stringify(event)
+                });
+
+            const message =
+                await response.text();
+
+            if (response.ok) {
+                showToast(
+                    message || 'Event deleted.'
+                );
+
+                loadEvents();
+
+            } else {
+                showToast(
+                    message || 'Failed to delete event.',
+                    true
+                );
+            }
+
+        } catch (error) {
+            console.error('Delete event error:', error);
+            showToast('An error occurred.', true);
+        }
+    }
+
+    // Toast messages
+    function showToast(message, isError = false) {
+        const container =
+            document.getElementById('toast-container');
+
+        const toast =
+            document.createElement('div');
+
+        toast.className =
+            'toast' + (isError ? ' error' : '');
+
+        toast.textContent =
+            message;
+
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.remove();
+        }, 3100);
+    }
+
+    // Protect text inserted into HTML
+    function escapeHtml(value) {
+        if (value === null || value === undefined) {
+            return '';
+        }
+
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    document.addEventListener(
+        'DOMContentLoaded',
+        () => {
+            loadBooks();
+            loadEvents();
+        }
+    );
+</script>
+
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Library Manager — Add Event</title>
+
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<nav>
+    <div class="nav-brand">
+        <span>&#128218;</span> Library Manager
+    </div>
+
+    <ul class="nav-links">
+        <li><a th:href="@{/}">Home</a></li>
+
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/catalouge}">Catalogue</a>
+        </li>
+
+        <li sec:authorize="hasAuthority('ROLE_LIBRARIAN')">
+            <a th:href="@{/librarian}">Edit Catalogue and Events</a>
+        </li>
+
+        <li th:unless="${#authorization.expression('hasAuthority(''ROLE_OWNER'')')}"
+            sec:authorize="hasAuthority('ROLE_ADMIN')">
+            <a th:href="@{/admin}">Edit Roles</a>
+        </li>
+
+        <li sec:authorize="hasAuthority('ROLE_OWNER')">
+            <a th:href="@{/owner}">Edit Roles</a>
+        </li>
+
+        <li sec:authorize="isAnonymous()">
+            <a th:href="@{/login}" class="btn-nav">Sign In</a>
+        </li>
+
+        <li sec:authorize="isAuthenticated()">
+            <form th:action="@{/logout}" method="post" style="display:inline;">
+                <button type="submit" class="btn-logout">Logout</button>
+            </form>
+        </li>
+    </ul>
+</nav>
+
+<div class="panel-header">
+    <h1>&#128197; Add New Event</h1>
+    <p>Fill in the details below to schedule a library event</p>
+</div>
+
+<div class="form-page">
+    <div class="form-card">
+        <h2>Event Details</h2>
+
+        <div class="form-group">
+            <label class="form-label" for="name">Event Name</label>
+            <input
+                    class="form-input"
+                    id="name"
+                    type="text"
+                    placeholder="e.g. Book Club Meeting"/>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="date">Date</label>
+            <input
+                    class="form-input"
+                    id="date"
+                    type="date"/>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="description">Description</label>
+            <textarea
+                    class="form-textarea"
+                    id="description"
+                    placeholder="What is this event about?"></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button
+                    type="button"
+                    class="btn btn-primary"
+                    onclick="submitEvent()">
+                Add Event
+            </button>
+
+            <a th:href="@{/librarian}" class="btn btn-secondary">
+                Cancel
+            </a>
+        </div>
+
+        <p id="error-msg"
+           style="color:var(--red);font-family:Arial,sans-serif;font-size:0.9rem;margin-top:1rem;display:none;">
+        </p>
+    </div>
+</div>
+
+<footer>
+    <p>&copy; 2026 Library Manager &mdash; Built with Spring Boot &amp; Thymeleaf</p>
+</footer>
+
+<script>
+    const csrfToken =
+        document.querySelector('meta[name="_csrf"]').getAttribute('content');
+
+    const csrfHeader =
+        document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+    async function submitEvent() {
+        const name =
+            document.getElementById('name').value.trim();
+
+        const date =
+            document.getElementById('date').value;
+
+        const description =
+            document.getElementById('description').value.trim();
+
+        const errEl =
+            document.getElementById('error-msg');
+
+        if (!name || !date || !description) {
+            errEl.textContent =
+                'Please fill in all fields before submitting.';
+
+            errEl.style.display = 'block';
+            return;
+        }
+
+        errEl.style.display = 'none';
+
+        try {
+            const response =
+                await fetch('/librarian/api/add_event', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        [csrfHeader]: csrfToken
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        description: description,
+                        date: date
+                    })
+                });
+
+            if (response.ok) {
+                window.location.href = '/librarian';
+                return;
+            }
+
+            const message = await response.text();
+
+            errEl.textContent =
+                message || 'Failed to add event. Please try again.';
+
+            errEl.style.display = 'block';
+
+        } catch (error) {
+            console.error(error);
+
+            errEl.textContent =
+                'An error occurred. Please try again.';
+
+            errEl.style.display = 'block';
+        }
+    }
+</script>
+
+</body>
+</html>

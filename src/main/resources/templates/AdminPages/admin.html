@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Library Manager — Admin Panel</title>
+    <meta name="_csrf"        th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<!-- ===== Navbar ===== -->
+<nav>
+    <div class="nav-brand">
+        <span>&#128218;</span> Library Manager
+    </div>
+    <ul class="nav-links">
+        <li><a th:href="@{/}">Home</a></li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/catalouge}">Catalogue</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/events}">Events</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/activity}">My Activity</a>
+        </li>
+        <li sec:authorize="hasAuthority('ROLE_LIBRARIAN')">
+            <a th:href="@{/librarian}">Edit Catelouge and Events</a>
+        </li>
+        <li th:unless="${#authorization.expression('hasAuthority(''ROLE_OWNER'')')}" sec:authorize="hasAuthority('ROLE_ADMIN')">
+            <a th:href="@{/admin}">Edit Roles</a>
+        </li>
+        <li sec:authorize="hasAuthority('ROLE_OWNER')">
+            <a th:href="@{/owner}">Edit Roles</a>
+        </li>
+        <li sec:authorize="isAnonymous()">
+            <a th:href="@{/login}" class="btn-nav">Sign In</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <form th:action="@{/logout}" method="post" style="display:inline;">
+                <button type="submit" class="btn-logout">Logout</button>
+            </form>
+        </li>
+    </ul>
+</nav>
+
+<!-- ===== Page Header ===== -->
+<div class="panel-header">
+    <h1>&#128101; Admin Panel</h1>
+    <p>Manage user and librarian roles</p>
+</div>
+
+<!-- ===== Main Content ===== -->
+<div class="panel-body">
+
+    <div class="table-toolbar">
+        <h2>All Users</h2>
+        <button class="btn btn-secondary" onclick="loadUsers()">&#8635; Refresh</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Current Role</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="users-tbody">
+                <tr><td colspan="5" class="table-loading">Loading users…</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- ===== Role Change Modal ===== -->
+<div class="modal-overlay" id="role-modal">
+    <div class="modal-box">
+        <h3>&#128101; Change Role</h3>
+        <p id="role-modal-msg">Select a new role for this user.</p>
+        <select class="form-select" id="role-select">
+            <option value="USER">User</option>
+            <option value="LIBRARIAN">Librarian</option>
+        </select>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeRoleModal()">Cancel</button>
+            <button class="btn btn-primary"   onclick="confirmRoleChange()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Toast ===== -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ===== Footer ===== -->
+<footer>
+    <p>&copy; 2026 Library Manager &mdash; Built with Spring Boot &amp; Thymeleaf</p>
+</footer>
+
+<script>
+    const csrfToken  = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+    let pendingUser = null;
+
+    // ── Load users ────────────────────────────────────────────────────────────
+    async function loadUsers() {
+        const tbody = document.getElementById('users-tbody');
+        tbody.innerHTML = '<tr><td colspan="5" class="table-loading">Loading…</td></tr>';
+        try {
+            const res = await fetch('/admin/api/get_users');
+            if (!res.ok) {
+                tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Could not load users — make sure the GET /admin/api/get_users endpoint is added.</td></tr>';
+                return;
+            }
+            const users = await res.json();
+            if (!users.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No users found.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = users.map((u, i) => {
+                const role = u.role || 'USER';
+                // Admins can only change between USER and LIBRARIAN
+                const canChange = role === 'USER' || role === 'LIBRARIAN';
+                return `<tr>
+                    <td style="color:var(--text-muted);font-size:0.78rem;">${i + 1}</td>
+                    <td><strong>${esc(u.name)}</strong></td>
+                    <td style="font-family:monospace;font-size:0.82rem;">${esc(u.email)}</td>
+                    <td><span class="role-badge ${esc(role)}">${esc(role)}</span></td>
+                    <td>
+                        ${canChange
+                            ? `<button class="btn btn-gold btn-sm"
+                                       onclick='openRoleModal(${JSON.stringify(encodeURIComponent(JSON.stringify(u)))})'>
+                                   Change Role
+                               </button>`
+                            : `<span style="color:var(--text-muted);font-size:0.8rem;font-family:Arial,sans-serif;">No action</span>`
+                        }
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch {
+            tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Failed to load users.</td></tr>';
+        }
+    }
+
+    // ── Role modal ────────────────────────────────────────────────────────────
+    function openRoleModal(encoded) {
+        pendingUser = JSON.parse(decodeURIComponent(encoded));
+        document.getElementById('role-modal-msg').textContent =
+            `Select a new role for ${pendingUser.name}. Current role: ${pendingUser.role}`;
+        // Pre-select the current role
+        const sel = document.getElementById('role-select');
+        sel.value = (pendingUser.role === 'LIBRARIAN') ? 'USER' : 'LIBRARIAN'; // default to opposite
+        document.getElementById('role-modal').classList.add('open');
+    }
+
+    function closeRoleModal() {
+        document.getElementById('role-modal').classList.remove('open');
+        pendingUser = null;
+    }
+
+    async function confirmRoleChange() {
+        if (!pendingUser) return;
+        const newRole = document.getElementById('role-select').value;
+        const user = pendingUser; // capture before closeRoleModal clears pendingUser
+        closeRoleModal();
+
+        const endpoint = newRole === 'LIBRARIAN'
+            ? '/admin/api/make_user_librarian'
+            : '/admin/api/make_librarian_user';
+
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+                body: JSON.stringify(user)
+            });
+            const msg = await res.text();
+            if (res.ok) {
+                showToast(`${user.name} is now a ${newRole}.`);
+                loadUsers();
+            } else {
+                showToast(msg || 'Role change failed.', true);
+            }
+        } catch { showToast('An error occurred.', true); }
+    }
+
+    // Close modal on backdrop click
+    document.getElementById('role-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeRoleModal();
+    });
+
+    // ── Toast ─────────────────────────────────────────────────────────────────
+    function showToast(message, isError = false) {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = 'toast' + (isError ? ' error' : '');
+        t.textContent = message;
+        c.appendChild(t);
+        setTimeout(() => t.remove(), 3100);
+    }
+
+    function esc(str) {
+        if (str == null) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadUsers);
+</script>
+
+</body>
+</html>

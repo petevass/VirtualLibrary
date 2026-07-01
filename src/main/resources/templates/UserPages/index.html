@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Library Manager — Home</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<!-- ===== Navbar ===== -->
+<nav>
+    <div class="nav-brand">
+        <span>&#128218;</span> Library Manager
+    </div>
+    <ul class="nav-links">
+        <li><a th:href="@{/}">Home</a></li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/catalouge}">Catalogue</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/events}">Events</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/activity}">My Activity</a>
+        </li>
+        <li sec:authorize="hasAuthority('ROLE_LIBRARIAN')">
+            <a th:href="@{/librarian}">Edit Catelouge and Events</a>
+        </li>
+        <li th:unless="${#authorization.expression('hasAuthority(''ROLE_OWNER'')')}" sec:authorize="hasAuthority('ROLE_ADMIN')">
+            <a th:href="@{/admin}">Edit Roles</a>
+        </li>
+        <li sec:authorize="hasAuthority('ROLE_OWNER')">
+            <a th:href="@{/owner}">Edit Roles</a>
+        </li>
+        <li sec:authorize="isAnonymous()">
+            <a th:href="@{/login}" class="btn-nav">Sign In</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <form th:action="@{/logout}" method="post" style="display:inline;">
+                <button type="submit" class="btn-logout">Logout</button>
+            </form>
+        </li>
+    </ul>
+</nav>
+
+<!-- ===== Hero ===== -->
+<section class="hero">
+    <div class="hero-content">
+        <div class="hero-badge">Your Digital Library</div>
+        <h1>Discover Your Next<br/><em>Great Read</em></h1>
+        <p>
+            Browse our curated collection, check out books instantly, and manage
+            your reading list — all in one place.
+        </p>
+        <div class="hero-actions">
+            <a sec:authorize="isAnonymous()" th:href="@{/login}" class="btn btn-gold">
+                Sign In to Get Started
+            </a>
+            <a sec:authorize="isAuthenticated()" th:href="@{/catalouge}" class="btn btn-gold">
+                Browse the Catalogue
+            </a>
+            <a th:href="@{#features}" class="btn btn-secondary" style="color:#fff;border-color:rgba(255,255,255,0.5);">
+                Learn More
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Stats Bar ===== -->
+<div class="stats-bar">
+    <div class="stats-inner">
+        <div class="stat-item">
+            <span class="number">10,000+</span>
+            <span class="label">Books Available</span>
+        </div>
+        <div class="stat-item">
+            <span class="number">50+</span>
+            <span class="label">Genres</span>
+        </div>
+        <div class="stat-item">
+            <span class="number">4 Weeks</span>
+            <span class="label">Checkout Period</span>
+        </div>
+        <div class="stat-item">
+            <span class="number">24/7</span>
+            <span class="label">Online Access</span>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Features ===== -->
+<section class="section" id="features">
+    <h2 class="section-title">Everything You Need</h2>
+    <p class="section-subtitle">A seamless library experience from search to return</p>
+    <div class="cards-grid">
+        <div class="feature-card">
+            <div class="feature-icon">&#128269;</div>
+            <h3>Smart Search</h3>
+            <p>Find books by title, author, genre, or ISBN. Filter by availability to see what you can check out right now.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">&#128722;</div>
+            <h3>Instant Checkout</h3>
+            <p>Check out any available book with one click. Books are yours for 4 weeks before the due date arrives.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">&#128100;</div>
+            <h3>Secure Login</h3>
+            <p>Sign in securely using your Google account. Your reading history and checkouts are kept private.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">&#128204;</div>
+            <h3>Easy Returns</h3>
+            <p>Return books directly through the catalogue. No visits required — manage everything online.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ===== CTA Banner (shown only to guests) ===== -->
+<div class="cta-banner" sec:authorize="isAnonymous()">
+    <h2>Ready to Start Reading?</h2>
+    <p>Sign in with your Google account to access the full catalogue and start checking out books today.</p>
+    <a th:href="@{/login}" class="btn btn-primary">Sign In with Google</a>
+</div>
+
+<!-- ===== How It Works ===== -->
+<section class="section" style="background-color: var(--cream-dark);">
+    <h2 class="section-title">How It Works</h2>
+    <p class="section-subtitle">Three simple steps to your next book</p>
+    <div class="cards-grid" style="max-width: 860px;">
+        <div class="feature-card">
+            <div class="feature-icon">1&#65039;&#8419;</div>
+            <h3>Sign In</h3>
+            <p>Log in securely using your Google account. New members are registered automatically on first login.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">2&#65039;&#8419;</div>
+            <h3>Browse &amp; Find</h3>
+            <p>Explore the catalogue, search by your favourite author or genre, and find books that are ready to take home.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">3&#65039;&#8419;</div>
+            <h3>Check Out &amp; Enjoy</h3>
+            <p>Click checkout, and the book is yours for 4 weeks. Return it when you're done — right from the catalogue.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Management Panel (role-based) ===== -->
+<section class="section" sec:authorize="hasAnyAuthority('ROLE_LIBRARIAN','ROLE_ADMIN','ROLE_OWNER')">
+    <h2 class="section-title">Management Panel</h2>
+    <p class="section-subtitle">Quick access based on your role</p>
+    <div class="cards-grid">
+
+        <div class="feature-card" sec:authorize="hasAnyAuthority('ROLE_LIBRARIAN','ROLE_OWNER')">
+            <div class="feature-icon">&#128218;</div>
+            <h3>Librarian</h3>
+            <p>Manage the book catalogue — add, edit, and remove titles from the library collection.</p>
+            <a th:href="@{/librarian}" class="btn btn-gold" style="display:inline-block;margin-top:12px;">Go to Librarian</a>
+        </div>
+
+        <div class="feature-card" sec:authorize="hasAnyAuthority('ROLE_ADMIN','ROLE_OWNER')">
+            <div class="feature-icon">&#128101;</div>
+            <h3>Admin</h3>
+            <p>Manage users, assign roles, and oversee library membership and access control.</p>
+            <a th:href="@{/admin}" class="btn btn-gold" style="display:inline-block;margin-top:12px;">Go to Admin</a>
+        </div>
+
+        <div class="feature-card" sec:authorize="hasAuthority('ROLE_OWNER')">
+            <div class="feature-icon">&#9881;</div>
+            <h3>Owner</h3>
+            <p>Full system access — configure settings, promote staff, and view system-wide reports.</p>
+            <a th:href="@{/owner}" class="btn btn-gold" style="display:inline-block;margin-top:12px;">Go to Owner Panel</a>
+        </div>
+
+    </div>
+</section>
+
+<!-- ===== Footer ===== -->
+<footer>
+    <p>&copy; 2026 Library Manager &mdash; Built with Spring Boot &amp; Thymeleaf</p>
+</footer>
+
+</body>
+</html>

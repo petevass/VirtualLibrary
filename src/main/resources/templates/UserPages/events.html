@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Library Manager — Events</title>
+    <meta name="_csrf"        th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<!-- ===== Navbar ===== -->
+<nav>
+    <div class="nav-brand">
+        <span>&#128218;</span> Library Manager
+    </div>
+    <ul class="nav-links">
+        <li><a th:href="@{/}">Home</a></li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/catalouge}">Catalogue</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/events}">Events</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <a th:href="@{/activity}">My Activity</a>
+        </li>
+        <li sec:authorize="hasAuthority('ROLE_LIBRARIAN')">
+            <a th:href="@{/librarian}">Edit Catelouge and Events</a>
+        </li>
+        <li th:unless="${#authorization.expression('hasAuthority(''ROLE_OWNER'')')}" sec:authorize="hasAuthority('ROLE_ADMIN')">
+            <a th:href="@{/admin}">Edit Roles</a>
+        </li>
+        <li sec:authorize="hasAuthority('ROLE_OWNER')">
+            <a th:href="@{/owner}">Edit Roles</a>
+        </li>
+        <li sec:authorize="isAnonymous()">
+            <a th:href="@{/login}" class="btn-nav">Sign In</a>
+        </li>
+        <li sec:authorize="isAuthenticated()">
+            <form th:action="@{/logout}" method="post" style="display:inline;">
+                <button type="submit" class="btn-logout">Logout</button>
+            </form>
+        </li>
+    </ul>
+</nav>
+
+<!-- User email for sign-up -->
+<span id="current-user-email" th:data-email="${#authentication.name}" style="display:none;"></span>
+
+<!-- ===== Page Header ===== -->
+<div class="catalogue-header">
+    <h1>&#128197; Upcoming Events</h1>
+    <p>Browse library events and programmes</p>
+</div>
+
+<!-- ===== Main Content ===== -->
+<div class="catalogue-body">
+
+    <!-- Results Count -->
+    <p id="results-count" style="font-family:Arial,sans-serif;font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;"></p>
+
+    <!-- Events Grid -->
+    <div class="events-grid" id="events-grid">
+        <div class="state-box">
+            <span class="state-icon">&#128197;</span>
+            <p>Loading events…</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- ===== Toast Container ===== -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ===== Footer ===== -->
+<footer>
+    <p>&copy; 2026 Library Manager &mdash; Built with Spring Boot &amp; Thymeleaf</p>
+</footer>
+
+<style>
+    .events-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .event-card {
+        background: var(--cream);
+        border: 1px solid var(--cream-dark);
+        border-radius: 10px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        transition: box-shadow 0.2s, transform 0.2s;
+    }
+
+    .event-card:hover {
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+        transform: translateY(-2px);
+    }
+
+    .event-card-header {
+        background: var(--green-dark);
+        color: #fff;
+        padding: 1rem 1.25rem;
+    }
+
+    .event-card-date {
+        font-family: Arial, sans-serif;
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 0.35rem;
+    }
+
+    .event-card-name {
+        font-family: Georgia, serif;
+        font-size: 1.15rem;
+        font-weight: bold;
+        line-height: 1.3;
+        margin: 0;
+    }
+
+    .event-card-body {
+        padding: 1rem 1.25rem;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .event-card-description {
+        font-family: Georgia, serif;
+        font-size: 0.92rem;
+        color: #444;
+        line-height: 1.6;
+        flex: 1;
+    }
+
+    .event-card-footer {
+        border-top: 1px solid var(--cream-dark);
+        padding: 0.65rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-family: Arial, sans-serif;
+        font-size: 0.82rem;
+        color: #666;
+    }
+
+    .event-attendee-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        background: var(--green-light);
+        color: var(--green-dark);
+        font-weight: 600;
+        padding: 0.2rem 0.6rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+    }
+
+    .event-past {
+        opacity: 0.65;
+    }
+
+    .event-past .event-card-header {
+        background: #888;
+    }
+
+    .event-past-label {
+        display: inline-block;
+        background: rgba(255,255,255,0.2);
+        border-radius: 4px;
+        font-size: 0.72rem;
+        padding: 0.1rem 0.45rem;
+        margin-top: 0.3rem;
+        font-family: Arial, sans-serif;
+    }
+</style>
+
+<script>
+    const csrfToken  = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+    const userEmail  = document.getElementById('current-user-email').dataset.email || '';
+
+    let allEvents = [];
+
+    document.addEventListener('DOMContentLoaded', loadEvents);
+
+    async function loadEvents() {
+        try {
+            const res = await fetch('/api/user/get_events');
+            if (!res.ok) throw new Error('Failed to load events');
+            allEvents = await res.json();
+            renderEvents(allEvents);
+        } catch (err) {
+            document.getElementById('events-grid').innerHTML = `
+                <div class="state-box">
+                    <span class="state-icon">&#9888;&#65039;</span>
+                    <p>Could not load events. Please try again.</p>
+                </div>`;
+        }
+    }
+
+    // Read a field that may be lowercase or capitalized (Jackson 3.x uses field names)
+    function getField(obj, lower, upper) {
+        return obj[lower] !== undefined ? obj[lower] : obj[upper];
+    }
+
+    // Parse LocalDate from any format Jackson might produce:
+    // "YYYY-MM-DD", [year,month,day], {year,monthValue,dayOfMonth,...}
+    function parseDate(raw) {
+        if (!raw) return new Date(NaN);
+        if (Array.isArray(raw)) return new Date(raw[0], raw[1] - 1, raw[2]);
+        if (typeof raw === 'object') {
+            const y = raw.year;
+            const m = (raw.monthValue != null ? raw.monthValue : 1) - 1;
+            const d = raw.dayOfMonth || 1;
+            return new Date(y, m, d);
+        }
+        const parts = String(raw).split('-').map(Number);
+        if (parts.length === 3 && !isNaN(parts[0])) return new Date(parts[0], parts[1] - 1, parts[2]);
+        return new Date(NaN);
+    }
+
+    function renderEvents(events) {
+        const grid    = document.getElementById('events-grid');
+        const countEl = document.getElementById('results-count');
+
+        if (!events || events.length === 0) {
+            grid.innerHTML = `
+                <div class="state-box">
+                    <span class="state-icon">&#128197;</span>
+                    <p>No events scheduled at the moment.</p>
+                </div>`;
+            countEl.textContent = '';
+            return;
+        }
+
+        events.sort((a, b) => parseDate(getField(a, 'date', 'Date')) - parseDate(getField(b, 'date', 'Date')));
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        countEl.textContent = `${events.length} event${events.length !== 1 ? 's' : ''} found`;
+        grid.innerHTML = events.map((event, i) => eventCard(event, i, today)).join('');
+    }
+
+    function eventCard(event, i, today) {
+        const name        = getField(event, 'name', 'Name') || '';
+        const description = getField(event, 'description', 'Description') || '';
+        const rawDate     = getField(event, 'date', 'Date');
+        const usersAttending = event.usersAttending || [];
+
+        const eventDate = parseDate(rawDate);
+        const isPast    = !isNaN(eventDate) && eventDate < today;
+        const alreadySignedUp = usersAttending.includes(userEmail);
+        const attendeeCount   = usersAttending.length;
+
+        const formattedDate = isNaN(eventDate)
+            ? 'Date unavailable'
+            : eventDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        const pastLabel = isPast ? `<span class="event-past-label">Past Event</span>` : '';
+
+        let signupBtn = '';
+        if (!isPast) {
+            signupBtn = alreadySignedUp
+                ? `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.6;">&#10003; Signed Up</button>`
+                : `<button class="btn btn-primary btn-sm" onclick="signUpForEvent(${i})">Sign Up</button>`;
+        }
+
+        return `
+        <div class="event-card ${isPast ? 'event-past' : ''}">
+            <div class="event-card-header">
+                <div class="event-card-date">${esc(formattedDate)}</div>
+                <div class="event-card-name">${esc(name)}</div>
+                ${pastLabel}
+            </div>
+            <div class="event-card-body">
+                <div class="event-card-description">${esc(description) || '<em>No description provided.</em>'}</div>
+            </div>
+            <div class="event-card-footer">
+                <span class="event-attendee-badge">&#128101; ${attendeeCount} attending</span>
+                ${signupBtn}
+            </div>
+        </div>`;
+    }
+
+    async function signUpForEvent(i) {
+        const event = allEvents[i];
+        try {
+            const res = await fetch(`/api/user/event_sign_up?userID=${encodeURIComponent(userEmail)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+                body: JSON.stringify(event)
+            });
+            const msg = await res.text();
+            if (res.ok) {
+                showToast('Signed up successfully!');
+                loadEvents();
+            } else {
+                showToast(msg || 'Sign up failed.', true);
+            }
+        } catch { showToast('An error occurred.', true); }
+    }
+
+    function showToast(message, isError = false) {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = 'toast' + (isError ? ' error' : '');
+        t.textContent = message;
+        c.appendChild(t);
+        setTimeout(() => t.remove(), 3100);
+    }
+
+    function esc(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+</script>
+
+</body>
+</html>
