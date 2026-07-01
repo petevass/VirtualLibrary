@@ -44,3 +44,7 @@ Credentials:
     * Owner- Email: owner2468135@gmail.com Password: owner@123
     * Admin-Email: admin4739@gmail.com Password: admin@1234
     * User- Just sign into the website using you email as the default role is User
+ 
+
+___
+AI was used to create the styles/css for the project
